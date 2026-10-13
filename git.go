@@ -60,19 +60,37 @@ func (r *repository) patch(diffArgs []string) (string, error) {
 	return out, nil
 }
 
-func (r *repository) difftastic(difft string, diffArgs []string) ([]difftasticFile, error) {
+func (r *repository) difftastic(runner difftasticRunner, diffArgs []string) ([]difftasticFile, error) {
+	jobs, cleanup, err := r.stageFilePairs(diffArgs)
+	defer cleanup()
+	if err != nil {
+		return nil, err
+	}
+	return runner.runAll(jobs), nil
+}
+
+func (r *repository) stageFilePairs(diffArgs []string) ([]externalDiffJob, func(), error) {
+	noop := func() {}
+	self, err := os.Executable()
+	if err != nil {
+		return nil, noop, fmt.Errorf("locating the tastic binary: %w", err)
+	}
+	stagingDir, err := os.MkdirTemp("", "tastic-pairs-")
+	if err != nil {
+		return nil, noop, err
+	}
+	cleanup := func() { os.RemoveAll(stagingDir) }
+
 	env := []string{
-		"GIT_EXTERNAL_DIFF=" + difft,
-		"DFT_DISPLAY=json",
-		"DFT_UNSTABLE=yes",
-		"DFT_COLOR=never",
+		"GIT_EXTERNAL_DIFF=" + shellQuote(self),
+		collectDirEnv + "=" + stagingDir,
 	}
 	args := append([]string{"diff", "--ext-diff", "--no-color", "-M"}, diffArgs...)
-	out, err := r.git(env, args...)
-	if err != nil {
-		return nil, fmt.Errorf("git diff through difftastic: %w", err)
+	if _, err := r.git(env, args...); err != nil {
+		return nil, cleanup, fmt.Errorf("collecting changed files: %w", err)
 	}
-	return parseDifftastic(strings.NewReader(out))
+	jobs, err := readStagedJobs(stagingDir)
+	return jobs, cleanup, err
 }
 
 func (r *repository) git(extraEnv []string, args ...string) (string, error) {

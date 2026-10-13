@@ -178,3 +178,8 @@ h1 {
 .empty {
   color: var(--muted);
 }
+
+.badge.failed {
+  color: var(--removed);
+  opacity: 1;
+}

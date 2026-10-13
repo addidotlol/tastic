@@ -14,10 +14,18 @@ type options struct {
 	noUpload    bool
 	description string
 	difft       string
+	graphLimit  int
 	diffArgs    []string
 }
 
 func main() {
+	if isExternalDiffInvocation() {
+		if err := stageExternalDiff(os.Args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "tastic: staging file pair for difftastic:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(parseOptions()); err != nil {
 		fmt.Fprintln(os.Stderr, "tastic:", err)
 		os.Exit(1)
@@ -30,6 +38,7 @@ func parseOptions() options {
 	flag.BoolVar(&opts.noUpload, "no-upload", false, "only write the HTML file, skip postplan.dev")
 	flag.StringVar(&opts.description, "description", "", "description shown on the postplan.dev dashboard")
 	flag.StringVar(&opts.difft, "difft", "difft", "difftastic binary to use")
+	flag.IntVar(&opts.graphLimit, "graph-limit", 1_000_000, "DFT_GRAPH_LIMIT for difftastic; lower is faster, 0 keeps difftastic's default")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: tastic [flags] [-- git diff args]")
 		fmt.Fprintln(flag.CommandLine.Output(), "\nRenders the current repo's git diff through difftastic and publishes it to postplan.dev.")
@@ -71,7 +80,7 @@ func run(opts options) error {
 		return errors.New("no changes to show")
 	}
 
-	files, err := repo.difftastic(difft, diffArgs)
+	files, err := repo.difftastic(difftasticRunner{binary: difft, graphLimit: opts.graphLimit}, diffArgs)
 	if err != nil {
 		return err
 	}

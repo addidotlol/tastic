@@ -15,6 +15,7 @@ interface DifftasticFile {
   status: string;
   deletions: Record<number, SpanList>;
   additions: Record<number, SpanList>;
+  failure?: string;
 }
 
 interface ViewerData {
@@ -81,16 +82,43 @@ function totalsBadge({ additions, deletions }: { additions: number; deletions: n
   ]);
 }
 
+function hasTokenSpans(fileDiff: FileDiffMetadata) {
+  const difftastic = findDifftastic(fileDiff);
+  if (!difftastic || difftastic.status !== "changed") return false;
+  return (
+    Object.keys(difftastic.deletions ?? {}).length > 0 ||
+    Object.keys(difftastic.additions ?? {}).length > 0
+  );
+}
+
 function languageBadge(fileDiff: FileDiffMetadata) {
   const difftastic = findDifftastic(fileDiff);
   if (!difftastic) return null;
-  const structural = difftastic.language !== "Text";
+  if (difftastic.failure) {
+    return element("span", {
+      className: "badge failed",
+      textContent: "difftastic failed",
+      title: `difftastic ${difftastic.failure} on this file, so it is shown as a plain line diff`,
+    });
+  }
+  if (difftastic.language.includes("exceeded")) {
+    return element("span", {
+      className: "badge",
+      textContent: "line diff",
+      title: "this change was too large for difftastic's graph limit, so it fell back to a line diff (raise it with -graph-limit)",
+    });
+  }
+  if (difftastic.language.startsWith("Text")) {
+    return element("span", {
+      className: "badge",
+      textContent: "line diff",
+      title: "difftastic has no parser for this file and fell back to a line diff",
+    });
+  }
   return element("span", {
-    className: structural ? "badge structural" : "badge",
-    textContent: structural ? difftastic.language : "line diff",
-    title: structural
-      ? `difftastic parsed this file as ${difftastic.language}`
-      : "difftastic has no parser for this file and fell back to a line diff",
+    className: "badge structural",
+    textContent: difftastic.language,
+    title: `difftastic parsed this file as ${difftastic.language}`,
   });
 }
 
@@ -190,6 +218,8 @@ function main() {
       theme: { dark: "pierre-dark", light: "pierre-light" },
       themeType: "system",
       diffStyle,
+      lineDiffType: "none",
+      disableBackground: hasTokenSpans(fileDiff),
       diffIndicators: "bars",
       hunkSeparators: "line-info",
       overflow: "scroll",
