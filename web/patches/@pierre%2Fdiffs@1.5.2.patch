@@ -1,0 +1,81 @@
+diff --git a/dist/types.d.ts b/dist/types.d.ts
+index b469f0a2b6cc0aa0cd250a294efb674faee2b2a4..e4ac171f83f2812c944d447ed90ee0f409705327 100644
+--- a/dist/types.d.ts
++++ b/dist/types.d.ts
+@@ -217,6 +217,11 @@ interface Hunk {
+  * this metadata object in place. Keep the same object identity stable when
+  * callers want that hydrated state to persist across later renders.
+  */
++type DifftasticSpanList = [startByte: number, endByte: number][];
++interface DifftasticSpans {
++  deletions?: Record<number, DifftasticSpanList>;
++  additions?: Record<number, DifftasticSpanList>;
++}
+ interface FileDiffMetadata {
+   /** The file's name and path. */
+   name: string;
+@@ -248,6 +253,7 @@ interface FileDiffMetadata {
+   prevMode?: string;
+   /** The type of change for this file. */
+   type: ChangeTypes;
++  difftastic?: DifftasticSpans;
+   /** Array of diff hunks containing line-level change information.  Each hunk
+    * corresponds to a `@@ -X,X +X,X @@` group in a diff. */
+   hunks: Hunk[];
+diff --git a/dist/utils/renderDiffWithHighlighter.js b/dist/utils/renderDiffWithHighlighter.js
+index e9e13f19321e1754934c386261d9abef0606778c..e57a20a4652f6abbd8e96bd76783b23142f4e49c 100644
+--- a/dist/utils/renderDiffWithHighlighter.js
++++ b/dist/utils/renderDiffWithHighlighter.js
+@@ -65,7 +65,20 @@ function renderDiffWithHighlighter(diff, highlighter, options, { forcePlainText,
+ 		callback: ({ hunkIndex, additionLine, deletionLine, type }) => {
+ 			const bucket = getBucketForHunk(hunkIndex);
+ 			const splitLineIndex = additionLine != null ? additionLine.splitLineIndex : deletionLine.splitLineIndex;
+-			if (type === "change" && additionLine != null && deletionLine != null) computeLineDiffDecorations({
++			if (diff.difftastic != null) {
++				if (type === "change" && deletionLine != null) pushDifftasticDecorations({
++					spans: diff.difftastic.deletions?.[deletionLine.lineNumber],
++					line: diff.deletionLines[deletionLine.lineIndex],
++					lineIndex: bucket.deletionContent.length,
++					decorations: bucket.deletionDecorations
++				});
++				if (type === "change" && additionLine != null) pushDifftasticDecorations({
++					spans: diff.difftastic.additions?.[additionLine.lineNumber],
++					line: diff.additionLines[additionLine.lineIndex],
++					lineIndex: bucket.additionContent.length,
++					decorations: bucket.additionDecorations
++				});
++			} else if (type === "change" && additionLine != null && deletionLine != null) computeLineDiffDecorations({
+ 				additionLine: diff.additionLines[additionLine.lineIndex],
+ 				deletionLine: diff.deletionLines[deletionLine.lineIndex],
+ 				deletionLineIndex: bucket.deletionContent.length,
+@@ -132,6 +145,30 @@ function renderDiffWithHighlighter(diff, highlighter, options, { forcePlainText,
+ 		baseThemeType
+ 	};
+ }
++function utf8OffsetToUtf16(line, byteOffset) {
++	let bytes = 0;
++	let index = 0;
++	while (index < line.length && bytes < byteOffset) {
++		const codePoint = line.codePointAt(index);
++		bytes += codePoint < 128 ? 1 : codePoint < 2048 ? 2 : codePoint < 65536 ? 3 : 4;
++		index += codePoint >= 65536 ? 2 : 1;
++	}
++	return index;
++}
++function pushDifftasticDecorations({ spans, line, lineIndex, decorations }) {
++	if (spans == null || line == null) return;
++	const text = cleanLastNewline(line);
++	for (const [startByte, endByte] of spans) {
++		const spanStart = utf8OffsetToUtf16(text, startByte);
++		const spanEnd = utf8OffsetToUtf16(text, endByte);
++		if (spanEnd <= spanStart) continue;
++		decorations.push(createDiffSpanDecoration({
++			line: lineIndex,
++			spanStart,
++			spanLength: spanEnd - spanStart
++		}));
++	}
++}
+ function pushWordLineDecorations(lineDiff, { deletionLineIndex, additionLineIndex, deletionDecorations, additionDecorations }) {
+ 	let deletionOffset = 0;
+ 	let additionOffset = 0;

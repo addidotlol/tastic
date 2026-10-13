@@ -1,0 +1,16 @@
+{
+  "name": "tastic-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts"
+  },
+  "dependencies": {
+    "@pierre/diffs": "1.5.2",
+    "@shikijs/langs": "3.23.0",
+    "shiki": "^3.0.0"
+  },
+  "patchedDependencies": {
+    "@pierre/diffs@1.5.2": "patches/@pierre%2Fdiffs@1.5.2.patch"
+  }
+}

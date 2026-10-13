@@ -1,0 +1,54 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  web:deps:
+    desc: Install viewer dependencies and apply the Pierre diffs patch
+    dir: web
+    cmds:
+      - bun install --frozen-lockfile
+    sources:
+      - package.json
+      - bun.lock
+      - patches/**
+    generates:
+      - node_modules/@pierre/diffs/package.json
+
+  web:build:
+    desc: Bundle the diff viewer into assets/
+    deps: [web:deps]
+    dir: web
+    cmds:
+      - bun run build.ts ../assets
+    sources:
+      - build.ts
+      - src/**
+      - package.json
+      - bun.lock
+      - patches/**
+    generates:
+      - ../assets/viewer.js
+      - ../assets/viewer.css
+
+  build:
+    desc: Build bin/tastic
+    deps: [web:build]
+    cmds:
+      - go build -o bin/tastic .
+
+  install:
+    desc: Install tastic into GOBIN (or ~/go/bin)
+    deps: [web:build]
+    cmds:
+      - go install .
+      - cmd: 'command -v difft >/dev/null || echo "difftastic (difft) is not on PATH, and tastic needs it at runtime"'
+        silent: true
+
+  clean:
+    desc: Remove build output
+    cmds:
+      - rm -rf bin assets/viewer.js assets/viewer.css
