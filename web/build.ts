@@ -1,5 +1,16 @@
 import type { BunPlugin } from "bun";
 
+const patchedPierreFile = Bun.resolveSync(
+  "./node_modules/@pierre/diffs/dist/utils/renderDiffWithHighlighter.js",
+  import.meta.dir,
+);
+if (!(await Bun.file(patchedPierreFile).text()).includes("pushDifftasticDecorations")) {
+  console.error(
+    "@pierre/diffs is missing tastic's difftastic patch. Install with `bun install` in web/ (npm and pnpm don't apply bun's patchedDependencies).",
+  );
+  process.exit(1);
+}
+
 const themingFile = (relativePath: string) =>
   JSON.stringify(
     Bun.resolveSync(`./node_modules/@pierre/theming/dist/${relativePath}`, import.meta.dir),

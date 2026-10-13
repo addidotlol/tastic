@@ -157,6 +157,8 @@ h1 {
 }
 
 .file {
+  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--added) 28%, transparent);
+  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--removed) 28%, transparent);
   scroll-margin-top: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);

@@ -17,6 +17,8 @@ tasks:
       - patches/**
     generates:
       - node_modules/@pierre/diffs/package.json
+    status:
+      - grep -q pushDifftasticDecorations node_modules/@pierre/diffs/dist/utils/renderDiffWithHighlighter.js
 
   web:build:
     desc: Bundle the diff viewer into assets/
@@ -27,6 +29,7 @@ tasks:
     sources:
       - build.ts
       - src/**
+      - node_modules/@pierre/diffs/dist/utils/renderDiffWithHighlighter.js
       - package.json
       - bun.lock
       - patches/**
