@@ -1,9 +1,18 @@
 import type { BunPlugin } from "bun";
 
-const pierreCollectionPath = Bun.resolveSync(
-  "./node_modules/@pierre/theming/dist/collections/pierre.js",
-  import.meta.dir,
-);
+const themingFile = (relativePath: string) =>
+  JSON.stringify(
+    Bun.resolveSync(`./node_modules/@pierre/theming/dist/${relativePath}`, import.meta.dir),
+  );
+
+const pierreThemesOnlyModule = `
+import { createThemeCollection } from ${themingFile("modules/createThemeCollection.js")};
+import { pierreThemes } from ${themingFile("collections/pierre.js")};
+export { createTheme } from ${themingFile("modules/createTheme.js")};
+export { pierreThemes };
+export const shikiThemes = createThemeCollection({ themes: [] });
+export const themes = createThemeCollection({ themes: [pierreThemes] });
+`;
 
 const trimBundle: BunPlugin = {
   name: "tastic-bundle-trim",
@@ -16,10 +25,7 @@ const trimBundle: BunPlugin = {
       namespace: "tastic-pierre-themes",
     }));
     build.onLoad({ filter: /.*/, namespace: "tastic-pierre-themes" }, () => ({
-      contents: [
-        `export { pierreThemes } from ${JSON.stringify(pierreCollectionPath)};`,
-        "export const shikiThemes = { getTheme: () => undefined };",
-      ].join("\n"),
+      contents: pierreThemesOnlyModule,
       loader: "js",
     }));
     build.onResolve({ filter: /^shiki\/wasm$/ }, () => ({
